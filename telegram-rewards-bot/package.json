@@ -1,0 +1,27 @@
+{
+  "name": "telegram-rewards-bot",
+  "version": "1.0.0",
+  "description": "Telegram referral rewards bot with SQLite-backed tracking and administrator-managed claims.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "referrals",
+    "rewards"
+  ],
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.9",
+    "telegraf": "^4.16.3"
+  }
+}

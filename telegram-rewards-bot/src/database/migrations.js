@@ -1,4 +1,11 @@
 const DEFAULT_REWARDS = [
+  { threshold: 50, amount: 100 },
+  { threshold: 100, amount: 300 },
+  { threshold: 200, amount: 500 },
+  { threshold: 400, amount: 1000 }
+];
+
+const PREVIOUS_DEFAULT_REWARDS = [
   { threshold: 50, amount: 1000 },
   { threshold: 100, amount: 3000 },
   { threshold: 200, amount: 5000 },
@@ -156,6 +163,29 @@ function migrate(db, adminIds = [], rewardDefaults = DEFAULT_REWARDS, legacyGrou
           continue;
         }
         for (const reward of rewardDefaults) seedRewards.run(chatId, reward.threshold, reward.amount);
+      }
+
+      if (!db.prepare(
+        "SELECT 1 FROM app_metadata WHERE key = 'default_rewards_divided_by_ten'"
+      ).get()) {
+        const updateDefaultReward = db.prepare(`
+          UPDATE reward_levels SET amount = ?
+          WHERE threshold = ? AND amount = ?
+        `);
+        for (const previousReward of PREVIOUS_DEFAULT_REWARDS) {
+          const currentReward = DEFAULT_REWARDS.find(
+            (reward) => reward.threshold === previousReward.threshold
+          );
+          updateDefaultReward.run(
+            currentReward.amount,
+            previousReward.threshold,
+            previousReward.amount
+          );
+        }
+        db.prepare(`
+          INSERT INTO app_metadata (key, value)
+          VALUES ('default_rewards_divided_by_ten', '1')
+        `).run();
       }
 
       const addGlobalAdmin = db.prepare(`

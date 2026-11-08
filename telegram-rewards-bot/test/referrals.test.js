@@ -91,13 +91,45 @@ test('new groups receive the specified default reward thresholds and amounts', (
   const db = createDatabase(':memory:', [9000]);
   ensureGroup(db, { id: GROUP_A, title: 'Group A', type: 'supergroup' });
   ensureGroup(db, { id: GROUP_B, title: 'Group B', type: 'supergroup' });
-  const expected = [[50, 1000], [100, 3000], [200, 5000], [400, 10000]];
+  const expected = [[50, 100], [100, 300], [200, 500], [400, 1000]];
   for (const groupId of [GROUP_A, GROUP_B]) {
     assert.deepEqual(db.prepare(`
       SELECT threshold, amount FROM reward_levels
       WHERE group_id = ? ORDER BY threshold
     `).all(groupId).map((level) => [level.threshold, level.amount]), expected);
   }
+  db.close();
+});
+
+test('migration divides existing default rewards by ten once and preserves custom amounts', () => {
+  const db = createDatabase(':memory:', [9000], [
+    { threshold: 50, amount: 1000 },
+    { threshold: 100, amount: 3000 },
+    { threshold: 200, amount: 5000 },
+    { threshold: 400, amount: 10000 }
+  ]);
+  ensureGroup(db, { id: GROUP_A, title: 'Group A', type: 'supergroup' }, [
+    { threshold: 50, amount: 1000 },
+    { threshold: 100, amount: 3000 },
+    { threshold: 200, amount: 5000 },
+    { threshold: 400, amount: 10000 }
+  ]);
+  db.prepare('UPDATE reward_levels SET amount = 4500 WHERE group_id = ? AND threshold = 200')
+    .run(GROUP_A);
+  db.prepare("DELETE FROM app_metadata WHERE key = 'default_rewards_divided_by_ten'").run();
+
+  migrate(db, [9000]);
+  const expected = [[50, 100], [100, 300], [200, 4500], [400, 1000]];
+  assert.deepEqual(db.prepare(`
+    SELECT threshold, amount FROM reward_levels
+    WHERE group_id = ? ORDER BY threshold
+  `).all(GROUP_A).map((level) => [level.threshold, level.amount]), expected);
+
+  migrate(db, [9000]);
+  assert.deepEqual(db.prepare(`
+    SELECT threshold, amount FROM reward_levels
+    WHERE group_id = ? ORDER BY threshold
+  `).all(GROUP_A).map((level) => [level.threshold, level.amount]), expected);
   db.close();
 });
 
@@ -252,7 +284,9 @@ test('legacy single-group database migration preserves records and promotes old 
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM reward_claims WHERE group_id = ?')
     .get(GROUP_A).count, 1);
   assert.equal(db.prepare('SELECT amount FROM reward_levels WHERE group_id = ? AND id = 5')
-    .get(GROUP_A).amount, 1000);
+    .get(GROUP_A).amount, 100);
+  assert.equal(db.prepare('SELECT amount_snapshot FROM reward_claims WHERE group_id = ? AND id = 9')
+    .get(GROUP_A).amount_snapshot, 1000);
   assert.ok(db.prepare('SELECT 1 FROM global_admins WHERE telegram_id = 9001').get());
   assert.ok(db.prepare('SELECT 1 FROM global_admins WHERE telegram_id = 9000').get());
   assert.equal(db.prepare('SELECT group_id FROM audit_logs WHERE id = 7').get().group_id, GROUP_A);
@@ -338,6 +372,43 @@ test('Telegram membership updates count and deactivate referrals in the originat
   assert.equal(referralsA.getStats(101).referralCount, 0);
   assert.equal(referralsB.getStats(101).referralCount, 1);
   assert.ok(sentMessages.length >= 4);
+  db.close();
+});
+
+test('multiple welcome messages are sent without waiting for earlier Telegram responses', async () => {
+  const { db } = setup();
+  const { bot } = createBot({
+    botToken: '123456789:TEST_TOKEN',
+    groupId: GROUP_A,
+    adminIds: [9000],
+    rewardDefaults: REWARDS
+  }, db);
+  const sentMessages = [];
+  const releaseSends = [];
+  bot.botInfo = { id: 123456789, is_bot: true, first_name: 'Test', username: 'testbot' };
+  bot.telegram.sendMessage = (...args) => {
+    sentMessages.push(args);
+    return new Promise((resolve) => releaseSends.push(resolve));
+  };
+
+  const updatePromise = bot.handleUpdate({
+    update_id: 1,
+    message: {
+      message_id: 1,
+      date: 1,
+      chat: { id: GROUP_A, title: 'Group A', type: 'supergroup' },
+      from: { id: 9000, is_bot: false, first_name: 'Admin' },
+      new_chat_members: [
+        { id: 501, first_name: 'First', is_bot: false },
+        { id: 502, first_name: 'Second', is_bot: false }
+      ]
+    }
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sentMessages.length, 2);
+  releaseSends.forEach((resolve) => resolve({}));
+  await updatePromise;
   db.close();
 });
 

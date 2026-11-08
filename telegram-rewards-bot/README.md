@@ -37,12 +37,12 @@ Newly registered groups get their own initial reward levels:
 
 | Active referrals | Reward |
 |---:|---:|
-| 50 | 1,000 ETB |
-| 100 | 3,000 ETB |
-| 200 | 5,000 ETB |
-| 400 | 10,000 ETB |
+| 50 | 100 ETB |
+| 100 | 300 ETB |
+| 200 | 500 ETB |
+| 400 | 1,000 ETB |
 
-These are group defaults. Changing or disabling a group's levels does not change any other group's configuration.
+These are group defaults. Existing default reward amounts are divided by ten once during migration. Custom reward amounts are preserved. Changing or disabling a group's levels does not change any other group's configuration.
 
 ## Add groups and member setup
 

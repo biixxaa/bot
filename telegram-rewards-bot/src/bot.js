@@ -170,9 +170,9 @@ function createBot(config, db = createDatabase(
   bot.on('new_chat_members', async (ctx) => {
     ensureGroup(db, ctx.chat, config.rewardDefaults);
     const inviteLinkUrl = ctx.message.invite_link?.invite_link;
-    for (const user of ctx.message.new_chat_members) {
-      await handleJoin(ctx.chat.id, user, inviteLinkUrl);
-    }
+    await Promise.all(ctx.message.new_chat_members.map((user) =>
+      handleJoin(ctx.chat.id, user, inviteLinkUrl)
+    ));
   });
 
   bot.on('my_chat_member', async (ctx) => {

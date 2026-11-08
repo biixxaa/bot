@@ -23,19 +23,24 @@ function createNotificationService(bot, db) {
 
   return {
     async welcome(groupId, user, rewardLevels) {
-      const rewardLines = rewardLevels.map((reward) =>
-        `✅ Invite ${reward.threshold} members – ${reward.amount.toLocaleString('en-US')} ETB`
-      ).join('\n');
       const name = escapeHtml(user.first_name || 'there');
+      const firstReward = rewardLevels[0];
+      const rewardLines = rewardLevels.map((reward) =>
+        `✅ Invite <b>${reward.threshold}</b> members — <b>${reward.amount.toLocaleString('en-US')} ETB</b>`
+      ).join('\n');
+      const intro = firstReward
+        ? `👉 Dear "<b>${name}</b>" user, invite <b>${firstReward.threshold}</b> of your contacts to the group and earn <b>${firstReward.amount.toLocaleString('en-US')} ETB</b>!`
+        : `👉 Dear "<b>${name}</b>" user, invite your contacts to the group and earn rewards!`;
       await bot.telegram.sendMessage(groupId, [
-        `🎉 <b>WELCOME TO OUR COMMUNITY!</b>`,
-        '',
-        `Welcome, ${name}! Invite your friends and earn exciting cash rewards.`,
-        '',
-        '🎁 <b>OUR REWARD PROGRAM</b>',
-        rewardLines,
-        '',
-        '🔥 The more members you invite, the bigger your reward!'
+        '◾ New Member',
+        intro,
+        ...(rewardLevels.length ? [
+          '',
+          '🎁 <b>Reward Levels:</b>',
+          rewardLines,
+          '',
+          '🔥 The more you invite, the bigger your reward!'
+        ] : [])
       ].join('\n'), { parse_mode: 'HTML' });
     },
     async referralMilestone(userId, reward) {

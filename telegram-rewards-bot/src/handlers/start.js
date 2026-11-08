@@ -3,53 +3,60 @@ const { mainMenu } = require('../utils/keyboards');
 
 function registerStartHandlers(bot) {
   const welcomeText = [
-    '🎉 <b>Welcome to the Referral Rewards Bot!</b>',
+    '🌹 Hi! I\'m your <b>Referral Rewards Bot</b>.',
     '',
-    'Invite new members to the group, track your active referrals, and request eligible ETB rewards.',
+    'Invite new members to your group and earn <b>ETB cash rewards</b>!',
     '',
-    'Use the menu below to get started. Rewards are reviewed by an administrator; payments are not automatic.'
+    '📌 Add me to your group as an <b>administrator</b> so I can track joins and create invite links.'
   ].join('\n');
 
   bot.start(async (ctx) => {
     ctx.services.referrals.saveUser(ctx.from);
-    if (ctx.groupId) {
-      await ctx.reply(welcomeText, { parse_mode: 'HTML', ...mainMenu(ctx.groupId) });
-      return;
-    }
-    const groups = ctx.db.prepare(`
-      SELECT g.chat_id, g.title FROM group_members m
-      JOIN groups g ON g.chat_id = m.group_id
-      WHERE m.user_id = ? AND m.is_member = 1 AND g.is_active = 1
-      ORDER BY g.title, g.chat_id
-    `).all(ctx.from.id);
-    if (groups.length) {
-      await ctx.reply('Choose the group you want to use:', Markup.inlineKeyboard(
-        groups.map((group) => [
-          Markup.button.callback(
-            `${group.title || 'Telegram group'} (${group.chat_id})`,
-            `select_group:${group.chat_id}`
-          )
-        ])
-      ));
-    } else {
-      await ctx.reply(
-        `${welcomeText}\n\nJoin a participating group first. Then use /invite <group_chat_id> in this private chat.`,
-        { parse_mode: 'HTML' }
-      );
-    }
+    await ctx.reply(welcomeText, {
+      parse_mode: 'HTML',
+      ...mainMenu(ctx.groupId, ctx.botInfo?.username)
+    });
   });
 
   bot.command('help', async (ctx) => {
     ctx.services.referrals.saveUser(ctx.from);
     await ctx.reply([
       '<b>How it works</b>',
-      '• Create your personal group invitation link with /invite.',
-      '• Only first-observed, link-attributed member joins count; referrals stop counting if the invitee leaves.',
-      '• View your current active referral total with /profile.',
-      '• Use /claim when you qualify. An administrator reviews every claim and handles payment manually.',
+      '• Tap <b>My Groups</b> to select your active group.',
+      '• Use <b>Invite Friends</b> to get your personal referral link.',
+      '• Only first-time, link-attributed joins count; referrals stop if the invitee leaves.',
+      '• Check your progress with <b>My Stats</b>.',
+      '• Use <b>Claim Reward</b> when you qualify — an administrator reviews every claim.',
       '',
       'Commands: /start, /invite, /profile, /rewards, /leaderboard, /claim, /help'
-    ].join('\n'), { parse_mode: 'HTML', ...(ctx.groupId ? mainMenu(ctx.groupId) : {}) });
+    ].join('\n'), {
+      parse_mode: 'HTML',
+      ...mainMenu(ctx.groupId, ctx.botInfo?.username)
+    });
+  });
+
+  bot.action('menu:groups', async (ctx) => {
+    await ctx.answerCbQuery();
+    const groups = ctx.db.prepare(`
+      SELECT g.chat_id, g.title FROM group_members m
+      JOIN groups g ON g.chat_id = m.group_id
+      WHERE m.user_id = ? AND m.is_member = 1 AND g.is_active = 1
+      ORDER BY g.title, g.chat_id
+    `).all(ctx.from.id);
+    if (!groups.length) {
+      await ctx.reply(
+        '⚙️ You are not currently recorded as a member of any active group.\n\nJoin a group that uses this bot, then come back here.'
+      );
+      return;
+    }
+    await ctx.reply('⚙️ Select a group:', Markup.inlineKeyboard(
+      groups.map((group) => [
+        Markup.button.callback(
+          `${group.title || 'Telegram group'} (${group.chat_id})`,
+          `select_group:${group.chat_id}`
+        )
+      ])
+    ));
   });
 
   bot.action(/^select_group:(-?\d+)$/, async (ctx) => {
@@ -61,7 +68,10 @@ function registerStartHandlers(bot) {
       await ctx.reply('You are not currently recorded as a member of that group.');
       return;
     }
-    await ctx.reply(welcomeText, { parse_mode: 'HTML', ...mainMenu(groupId) });
+    await ctx.reply(
+      `✅ Group <code>${groupId}</code> selected. Use the menu below:`,
+      { parse_mode: 'HTML', ...mainMenu(groupId, ctx.botInfo?.username) }
+    );
   });
 
   bot.action(/^menu:help(?::(-?\d+))?$/, async (ctx) => {

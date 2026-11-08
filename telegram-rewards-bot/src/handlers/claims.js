@@ -17,7 +17,7 @@ function registerClaimHandlers(bot) {
     const buttons = rewards.map((reward) => [
       Markup.button.callback(
         `${reward.threshold} members — ${reward.amount.toLocaleString('en-US')} ETB`,
-        `claim:${reward.id}`
+        `claim:${ctx.groupId}:${reward.id}`
       )
     ]);
     await ctx.reply('Select the reward level you want to claim. Each level can only be claimed once:', {
@@ -26,17 +26,21 @@ function registerClaimHandlers(bot) {
   }
 
   bot.command('claim', (ctx) => showClaimOptions(ctx));
-  bot.action('menu:claim', (ctx) => showClaimOptions(ctx, true));
+  bot.action(/^menu:claim(?::(-?\d+))?$/, (ctx) => showClaimOptions(ctx, true));
 
-  bot.action(/^claim:(\d+)$/, async (ctx) => {
+  bot.action(/^claim:(-?\d+):(\d+)$/, async (ctx) => {
     await ctx.answerCbQuery();
-    const rewardId = Number(ctx.match[1]);
+    const rewardId = Number(ctx.match[2]);
     ctx.services.referrals.saveUser(ctx.from);
     try {
       const claim = ctx.services.rewards.requestClaim(ctx.from.id, rewardId);
       await ctx.reply(`✅ Claim #${claim.id} submitted for ${claim.amount.toLocaleString('en-US')} ETB. An administrator will review it.`);
       const user = ctx.services.referrals.getUser(ctx.from.id);
-      await ctx.services.notifications.claimRequested({ ...claim, user_id: ctx.from.id }, user);
+      await ctx.services.notifications.claimRequested(
+        ctx.groupId,
+        { ...claim, user_id: ctx.from.id },
+        user
+      );
     } catch (error) {
       await ctx.reply(error.message);
     }

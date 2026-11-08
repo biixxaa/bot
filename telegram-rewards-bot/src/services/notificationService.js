@@ -1,7 +1,13 @@
 const logger = require('../utils/logger');
 
-function createNotificationService(bot, adminIds, groupId) {
-  async function sendAdminMessage(text, extra) {
+function createNotificationService(bot, db) {
+  async function sendAdminMessage(groupId, text, extra) {
+    const adminIds = db.prepare(`
+      SELECT telegram_id AS id FROM global_admins
+      UNION
+      SELECT telegram_id AS id FROM group_admins WHERE group_id = ?
+      ORDER BY id
+    `).all(groupId).map((row) => row.id);
     const results = await Promise.allSettled(adminIds.map((id) =>
       bot.telegram.sendMessage(id, text, extra)
     ));
@@ -16,7 +22,7 @@ function createNotificationService(bot, adminIds, groupId) {
   }
 
   return {
-    async welcome(user, rewardLevels) {
+    async welcome(groupId, user, rewardLevels) {
       const rewardLines = rewardLevels.map((reward) =>
         `✅ Invite ${reward.threshold} members – ${reward.amount.toLocaleString('en-US')} ETB`
       ).join('\n');
@@ -45,10 +51,11 @@ function createNotificationService(bot, adminIds, groupId) {
         });
       }
     },
-    async claimRequested(claim, user) {
+    async claimRequested(groupId, claim, user) {
       const who = user.username ? `@${user.username}` : `${user.first_name} (${claim.user_id})`;
       await sendAdminMessage(
-        `💰 New reward claim #${claim.id}\nMember: ${who}\nInvitations: ${claim.threshold}\nAmount: ${claim.amount.toLocaleString('en-US')} ETB\nReview with /approve ${claim.id} or /reject ${claim.id} [reason].`
+        groupId,
+        `💰 New reward claim #${claim.id} for group ${groupId}\nMember: ${who}\nInvitations: ${claim.threshold}\nAmount: ${claim.amount.toLocaleString('en-US')} ETB\nReview using /approve ${claim.id} or /reject ${claim.id} [reason] with this group selected.`
       );
     },
     async claimReviewed(userId, status, claim, note) {

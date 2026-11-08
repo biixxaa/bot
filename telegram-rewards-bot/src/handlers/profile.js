@@ -36,7 +36,7 @@ function registerProfileHandlers(bot) {
     }
   }
   bot.command('profile', (ctx) => showProfile(ctx));
-  bot.action('menu:stats', (ctx) => showProfile(ctx, true));
+  bot.action(/^menu:stats(?::(-?\d+))?$/, (ctx) => showProfile(ctx, true));
 }
 
 module.exports = { registerProfileHandlers, renderProfile };

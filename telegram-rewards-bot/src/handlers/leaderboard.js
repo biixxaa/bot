@@ -18,7 +18,7 @@ function registerLeaderboardHandlers(bot) {
   }
 
   bot.command('leaderboard', (ctx) => show(ctx));
-  bot.action('menu:leaderboard', (ctx) => show(ctx, true));
+  bot.action(/^menu:leaderboard(?::(-?\d+))?$/, (ctx) => show(ctx, true));
 }
 
 function escapeHtml(value) {

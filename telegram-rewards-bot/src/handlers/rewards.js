@@ -16,7 +16,7 @@ function registerRewardHandlers(bot) {
     await ctx.reply(text, { parse_mode: 'HTML' });
   }
   bot.command('rewards', (ctx) => show(ctx));
-  bot.action('menu:rewards', (ctx) => show(ctx, true));
+  bot.action(/^menu:rewards(?::(-?\d+))?$/, (ctx) => show(ctx, true));
 }
 
 module.exports = { registerRewardHandlers };
